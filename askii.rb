@@ -34,6 +34,9 @@ module Askii
       (0...length).map {TEMP_FILE_CHARS[rand(TEMP_FILE_CHARS.length)]}.join
     end
 
+    def average_luminosity(im)
+    end
+
     def save_image(url, params)
       resp = Net::HTTP.get_response url
 
@@ -74,8 +77,9 @@ module Askii
 
     def process_tweet_images(tweet, params)
       urls = self.get_media_urls(tweet) + self.get_urls(tweet)
-      urls.inject([]) do |acc, url|
-        f = self.save_image url, params
+      urls.map do |url|
+        self.save_image url, params
+      end.compact.inject([]) do |acc, file|
         self.make_ascii f, params
         self.render_html f
         acc << f
