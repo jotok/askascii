@@ -43,25 +43,26 @@ module Askii
       end
 
       begin
-        ary = Magick::Image.from_blob resp.body
+        # Image.from_blob returns a list of Image objects Adding them to an ImageList and
+        # flattening ensures that png transparency is properly handled
+
+        ilist = Magick::ImageList.new
+        Magick::Image.from_blob(resp.body).each {|im| ilist << im}
+        image = ilist.flatten_images
       rescue Magick::ImageMagickError
         puts 'An error occurred while trying to encode the image.'
         return nil
       end
 
       output_dir = params['filesystem']['output_directory']
-      files = ary.map {File.join output_dir, self.generate_file_name}
+      file = File.join output_dir, self.generate_file_name
+      image.write "#{file}.jpg"
 
-      ary.zip(files).each do |image, file|
-        image.format = 'JPEG'
-        image.write file
-      end
-
-      files.compact
+      file
     end
 
     def make_ascii(file, params)
-      html = `#{params['filesystem']['jp2a_program']} --html --color #{file}`
+      html = `#{params['filesystem']['jp2a_program']} --html --color #{file}.jpg`
       File.open "#{file}.html", "w" do |f|
         f.write html
       end
