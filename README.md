@@ -1,5 +1,5 @@
 # askascii
-A twitter client that converts images to ASCII. 
+A twitter client that converts images to ASCII. Tweet an image or image link to @askascii, and it will reply with an ASCII art version of your image.
 
 The script looks for a file named `config.yaml` in the project directory that contains the twitter OAuth tokens:
 
