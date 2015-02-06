@@ -74,14 +74,11 @@ module Askii
 
     def process_tweet_images(tweet, params)
       urls = self.get_media_urls(tweet) + self.get_urls(tweet)
-      all_files = urls.inject([]) do |acc, url|
-        files = self.save_image url, params
-        files.each do |f|
-          self.make_ascii f, params
-          self.render_html f
-        end
-
-        acc += files
+      urls.inject([]) do |acc, url|
+        f = self.save_image url, params
+        self.make_ascii f, params
+        self.render_html f
+        acc << f
       end
     end
 
