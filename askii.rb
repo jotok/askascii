@@ -6,11 +6,78 @@ require 'RMagick'
 
 module Askii
 
+  class Art
+
+    class <<self
+      TEMP_FILE_CHARS = [('a'..'z'), ('A'..'Z')].map {|i| i.to_a}.flatten
+
+      def generate_file_name(length: 8)
+        (0...length).map {TEMP_FILE_CHARS[rand(TEMP_FILE_CHARS.length)]}.join
+      end
+
+      def average_luminosity(image)
+      end
+    end
+
+    attr_reader :url, :directory, :file, :luminosity
+
+    def initialize(url, directory: '.')
+      url = URI.parse url if url.is_a? String
+
+      @url = url
+      @directory = directory
+    end
+
+    def process!
+      result = save_jpeg! or return false
+      render_ascii!
+      render_png!
+
+      true
+    end
+
+    protected
+
+    def save_jpeg!(follow_redirect: 1)
+      resp = Net::HTTP.get_response @url
+
+      follow_redirect.times do
+        break if resp.code != "302"
+        resp = Net::HTTP.get_response resp['location']
+      end
+
+      begin
+        # Image.from_blob returns a list of Image objects Adding them to an ImageList and
+        # flattening ensures that png transparency is properly handled
+
+        ilist = Magick::ImageList.new
+        Magick::Image.from_blob(resp.body).each {|im| ilist << im}
+        image = ilist.flatten_images
+      rescue Magick::ImageMagickError
+        puts 'An error occurred while trying to encode the image.'
+        return nil
+      end
+
+      @file = File.join @directory, self.class.generate_file_name
+      @luminosity = self.class.average_luminosity image
+
+      image.write "#{@file}.jpg"
+    end
+
+    def render_ascii!
+      html = `jp2a --html --color #{@file}.jpg`
+      File.open "#{@file}.html", "w" do |f|
+        f.write html
+      end
+    end
+
+    def render_png!
+      `phantomjs capture.js #{@file}.html #{@file}.png`
+    end
+    
+  end
+
   class <<self
-
-    EXT = %w{jpg jpeg png gif}
-
-    TEMP_FILE_CHARS = [('a'..'z'), ('A'..'Z')].map {|i| i.to_a}.flatten
 
     def connect(params)
 
@@ -28,51 +95,6 @@ module Askii
 
     def get_urls(tweet)
       tweet.urls.map {|u| URI.parse u.expanded_url}
-    end
-
-    def generate_file_name(length: 8)
-      (0...length).map {TEMP_FILE_CHARS[rand(TEMP_FILE_CHARS.length)]}.join
-    end
-
-    def average_luminosity(im)
-    end
-
-    def save_image(url, params)
-      resp = Net::HTTP.get_response url
-
-      # try 1 redirect
-      if resp.code == "302"
-        resp = Net::HTTP.get_response URI.parse(resp['location'])
-      end
-
-      begin
-        # Image.from_blob returns a list of Image objects Adding them to an ImageList and
-        # flattening ensures that png transparency is properly handled
-
-        ilist = Magick::ImageList.new
-        Magick::Image.from_blob(resp.body).each {|im| ilist << im}
-        image = ilist.flatten_images
-      rescue Magick::ImageMagickError
-        puts 'An error occurred while trying to encode the image.'
-        return nil
-      end
-
-      output_dir = params['filesystem']['output_directory']
-      file = File.join output_dir, self.generate_file_name
-      image.write "#{file}.jpg"
-
-      file
-    end
-
-    def make_ascii(file, params)
-      html = `#{params['filesystem']['jp2a_program']} --html --color #{file}.jpg`
-      File.open "#{file}.html", "w" do |f|
-        f.write html
-      end
-    end
-
-    def render_html(file)
-      `phantomjs capture.js #{file}.html #{file}.png`
     end
 
     def process_tweet_images(tweet, params)
