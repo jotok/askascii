@@ -4,7 +4,7 @@ require 'uri'
 require 'yaml'
 require 'RMagick'
 
-module Askii
+class Askii
 
   class Art
 
@@ -23,16 +23,14 @@ module Askii
 
     def initialize(url, directory: '.')
       url = URI.parse url if url.is_a? String
-
       @url = url
       @directory = directory
     end
 
     def process!
-      result = save_jpeg! or return false
+      save_jpeg! or return false
       render_ascii!
       render_png!
-
       true
     end
 
@@ -79,15 +77,6 @@ module Askii
 
   class <<self
 
-    def connect(params)
-
-      @client = Twitter::REST::Client.new do |config|
-        params['twitter'].each do |k, v|
-          config.send "#{k}=", v
-        end
-      end
-    end
-
     def get_media_urls(tweet)
       images = tweet.media.select {|m| m.is_a? Twitter::Media::Photo}
       images.map &:media_url
@@ -97,23 +86,28 @@ module Askii
       tweet.urls.map {|u| URI.parse u.expanded_url}
     end
 
-    def process_tweet_images(tweet, params)
+    def process_tweet_images(tweet, directory: '.')
       urls = self.get_media_urls(tweet) + self.get_urls(tweet)
       urls.map do |url|
-        self.save_image url, params
-      end.compact.inject([]) do |acc, file|
-        self.make_ascii f, params
-        self.render_html f
-        acc << f
-      end
-    end
-
-    def process_tweets(tweets, params)
-
+        art = Art.new url, directory: directory
+        art.process! ? art : nil
+      end.compact
     end
 
   end
 
-end
+  attr_reader :client
 
-# params = YAML::load_file(config_file)
+  def initialize(config_file: 'config.yaml')
+      config = YAML.load_file config_file
+
+      @client = Twitter::REST::Client.new do |config|
+        config['twitter'].each do |k, v|
+          config.send "#{k}=", v
+        end
+      end
+
+      @work_directory = config['filesystem']['work_directory']
+  end
+
+end
