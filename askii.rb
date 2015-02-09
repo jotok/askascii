@@ -16,6 +16,17 @@ class Askii
       end
 
       def average_luminosity(image)
+        r = g = b = 0.0
+        n = image.rows * image.columns
+        denom = n * Magick::QuantumRange
+
+        image.each_pixel do |px|
+          r += px.red.to_f / denom
+          g += px.green.to_f / denom
+          b += px.blue.to_f / denom
+        end
+
+        0.2126 * r + 0.7152 * g + 0.0722 *b
       end
     end
 
