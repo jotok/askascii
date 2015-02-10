@@ -1,4 +1,5 @@
 require 'net/http'
+require 'sequel'
 require 'twitter'
 require 'uri'
 require 'yaml'
@@ -26,7 +27,8 @@ class Askii
           b += px.blue.to_f / denom
         end
 
-        0.2126 * r + 0.7152 * g + 0.0722 *b
+        0.2126 * r + 0.7152 * g + 0.0722 * b
+
       end
     end
 
@@ -74,7 +76,10 @@ class Askii
     end
 
     def render_ascii!
-      html = `jp2a --html --color #{@file}.jpg`
+      flags = %w(--html --color)
+      flags << '--invert' if @luminosity > 0.72
+
+      html = `jp2a #{flags} #{@file}.jpg`
       File.open "#{@file}.html", "w" do |f|
         f.write html
       end
@@ -105,20 +110,27 @@ class Askii
       end.compact
     end
 
+    def init_db(db)
+      db.create_table :access do
+        integer :since_id
+      end
+    end
+
   end
 
-  attr_reader :client
+  attr_reader :client, :db, :work_directory 
 
   def initialize(config_file: 'config.yaml')
-      config = YAML.load_file config_file
+      params = YAML.load_file config_file
 
       @client = Twitter::REST::Client.new do |config|
-        config['twitter'].each do |k, v|
+        params['twitter'].each do |k, v|
           config.send "#{k}=", v
         end
       end
 
-      @work_directory = config['filesystem']['work_directory']
+      @work_directory = params['filesystem']['work_directory']
+      @db = Sequel.sqlite params['filesystem']['db_file']
   end
 
 end
